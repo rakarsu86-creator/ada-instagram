@@ -1,0 +1,35 @@
+name: Gunluk taslak
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 09:00 Türkiye saati (UTC+3)
+  workflow_dispatch:       # elle çalıştırma düğmesi
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Yazı tipi ve bağımlılıklar
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y fonts-dejavu-core
+          pip install -r requirements.txt
+      - name: Taslağı üret
+        run: python ada_instagram_post.py draft
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: Depoya kaydet
+        run: |
+          git config user.name "ada-bot"
+          git config user.email "ada-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || (git commit -m "Taslak $(date -u +%F)" && git push)
