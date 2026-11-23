@@ -28,6 +28,13 @@ KAYNAKLAR = [
     ("Ticaret Bakanlığı duyuruları", "https://ticaret.gov.tr/duyurular"),  # URL'yi tarayıcıdan kontrol edin
 ]
 
+# Her gönderiye eklenen sabit hashtag'ler (gümrük müşaviri arayanların kullanabileceği konular)
+SABIT_HASHTAGLER = [
+    "#gümrükmüşaviri", "#gümrükmüşavirliği", "#gumrukmusaviri", "#gümrükleme",
+    "#gümrükişlemleri", "#gümrükdanışmanlığı", "#ithalat", "#ihracat",
+    "#dışticaret", "#ithalatihracat", "#gümrükbeyannamesi", "#lojistik",
+]
+
 # Görsel renkleri (marka renklerinize göre değiştirin)
 NAVY = (11, 37, 69)
 GOLD = (201, 162, 39)
@@ -50,7 +57,8 @@ JSON şeması:
   "mod": "haber" veya "rehber",
   "baslik": "en fazla 60 karakter",
   "maddeler": ["en fazla 4 madde, her biri en fazla 90 karakter"],
-  "caption": "Instagram açıklaması: 1 giriş cümlesi, 3-5 kısa paragraf veya madde, son satırda 5-8 ilgili hashtag",
+  "caption": "Instagram açıklaması: 1 giriş cümlesi, 3-5 kısa paragraf veya madde. Hashtag EKLEME, onlar ayrıca eklenecek",
+  "hashtagler": ["bu gönderinin konusuna özel en fazla 4 hashtag; # ile başlasın, boşluk veya noktalama içermesin"],
   "kaynak": "haber modunda kaynak adı ve varsa URL; rehber modunda boş bırak",
   "kontrol_notu": "Yayından önce insanın doğrulaması gereken iddiaları 1-3 cümleyle yaz"
 }"""
@@ -210,6 +218,18 @@ def gorsel_uret(d, yol):
     img.save(yol, "JPEG", quality=92)
 
 
+def hashtag_blogu(d):
+    """Sabit hashtag'ler + Claude'un konuya özel önerdikleri (tekrarsız)."""
+    liste, gorulen = [], set()
+    ozel = d.get("hashtagler") or []
+    for h in SABIT_HASHTAGLER + [str(x) for x in ozel][:4]:
+        h = "#" + re.sub(r"\W", "", h.lstrip("#"))
+        if len(h) > 1 and h.lower() not in gorulen:
+            gorulen.add(h.lower())
+            liste.append(h)
+    return " ".join(liste)
+
+
 # ---------------- Instagram ----------------
 def ig_yayinla(image_url, caption):
     uid, tok = env("IG_USER_ID"), env("IG_ACCESS_TOKEN")
@@ -252,10 +272,11 @@ def draft():
     klasor.mkdir(parents=True, exist_ok=True)
     gorsel_uret(d, klasor / "post.jpg")
 
-    caption = d.get("caption", "").strip()
+    caption = re.sub(r"(?:\s*#\w+)+\s*$", "", d.get("caption", "").strip()).strip()  # sonda hashtag kaldıysa temizle
     if d.get("kaynak"):
         caption += f"\n\nKaynak: {d['kaynak']}"
     caption += "\n\nBu paylaşım bilgilendirme amaçlıdır; somut durumunuz için müşavirinize danışın."
+    caption += "\n\n" + hashtag_blogu(d)
 
     (klasor / "post.json").write_text(json.dumps({
         "mod": d["mod"], "baslik": d["baslik"], "caption": caption,
